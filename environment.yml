@@ -1,0 +1,23 @@
+name: financial-market-project
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # (optional but handy for notebooks)
+  - jupyterlab
+  - ipykernel
+  # install your package + all runtime deps from pyproject.toml via pip
+  - pip:
+      - -e .
+      # developer tools
+      - pre-commit
+      - black==24.8.0
+      - isort==5.13.2
+      - flake8==7.1.0
+      - nbqa==1.9.0
+      - nbstripout==0.6.1
+      - pytest>=8.0
+      # if you want to pin heavy libs separately, uncomment these lines
+      # - scikit-learn>=1.4
+      # - torch>=2.2  # CPU-only; macOS will use MPS if available

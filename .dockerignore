@@ -1,0 +1,10 @@
+.git
+__pycache__/
+.ipynb_checkpoints/
+data/*
+!data/raw/.gitkeep
+reports/figures/*
+reports/metrics/*
+models/*
+.venv/
+.env

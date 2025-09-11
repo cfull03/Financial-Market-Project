@@ -1,0 +1,25 @@
+# Auto-generated from project tree + CSV scan
+# Dataset: data/raw/Global finance data.csv
+# Rows: 39, Cols: 26
+# Inferred target: Banking_Sector_Health (3 classes)
+# ID-like columns (near-unique): Country, Stock_Index
+# Constant columns detected (FYI): Date, Oil_Price_USD_Barrel, Gold_Price_USD_Ounce
+
+project_name: financial_market_project
+random_state: 42
+
+input:
+  target: Banking_Sector_Health
+  id_columns: [Country, Stock_Index]
+  datetime_columns: [Date]
+  categorical_max_cardinality: 50
+
+split:
+  test_size: 0.2
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  figures_dir: reports/figures
+  metrics_dir: reports/metrics

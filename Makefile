@@ -2,6 +2,7 @@
 
 PYTHON := python
 PIP := pip
+SHELL := /bin/bash
 
 help:
 	@echo "Targets: install, lint, format, check, clean"
@@ -11,11 +12,11 @@ install:
 	$(PIP) install pre-commit black isort flake8
 	pre-commit install || true
 
-# Run all pre-commit hooks against the entire repo
+# Run all pre-commit hooks against the entire repo (fail on issues)
 lint:
-	pre-commit run --all-files || true
+	pre-commit run --all-files
 
-# Auto-format code (fix whitespace with Black, sort imports)
+# Auto-format code
 format:
 	black .
 	isort . --profile=black --line-length=100

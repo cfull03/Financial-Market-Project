@@ -1,0 +1,53 @@
+# Schema for Financial-Market-Project
+# Generated from: data/raw/Global finance data.csv
+# Purpose: validate base columns and allow engineered features via `feature_rules`.
+
+no_extra_columns: false
+
+columns:
+  Country: {type: string, max_missing: 0.0}
+  Date: {type: datetime, max_missing: 0.0}
+  Stock_Index: {type: string, max_missing: 0.0}
+  Index_Value: {type: float, max_missing: 0.0}
+  Daily_Change_Percent: {type: float, max_missing: 0.0}
+  Market_Cap_Trillion_USD: {type: float, max_missing: 0.0}
+  GDP_Growth_Rate_Percent: {type: float, max_missing: 0.0}
+  Inflation_Rate_Percent: {type: float, max_missing: 0.0}
+  Interest_Rate_Percent: {type: float, max_missing: 0.0}
+  Unemployment_Rate_Percent: {type: float, max_missing: 0.0}
+  Currency_Code: {type: string, max_missing: 0.0}
+  Exchange_Rate_USD: {type: float, max_missing: 0.0}
+  Currency_Change_YTD_Percent: {type: float, max_missing: 0.0}
+  Government_Debt_GDP_Percent: {type: float, max_missing: 0.0}
+  Current_Account_Balance_Billion_USD: {type: float, max_missing: 0.0}
+  FDI_Inflow_Billion_USD: {type: float, max_missing: 0.0}
+  Commodity_Index: {type: float, max_missing: 0.0}
+  Oil_Price_USD_Barrel: {type: float, max_missing: 0.0}
+  Gold_Price_USD_Ounce: {type: float, max_missing: 0.0}
+  Bond_Yield_10Y_Percent: {type: float, max_missing: 0.0}
+  Credit_Rating:
+    type: string
+    max_missing: 0.0
+    allowed: [A, A+, A-, AA, AA+, AAA, B+, B-, BB+, BB-, BBB, BBB+, BBB-, CCC+]
+  Political_Risk_Score: {type: float, max_missing: 0.0}
+  Banking_Sector_Health:
+    type: string
+    max_missing: 0.0
+    allowed: [Moderate, Strong, Weak]
+  Real_Estate_Index: {type: float, max_missing: 0.0}
+  Export_Growth_Percent: {type: float, max_missing: 0.0}
+  Import_Growth_Percent: {type: float, max_missing: 0.0}
+
+# Rules for engineered features (validated by CLI `validate` and cleaned by `clean-features`).
+feature_rules:
+  # Datetime expansions like Date_year, Date_month, Date_dow, Date_quarter
+  - pattern: "(?:^|_)year$|(?:^|_)month$|(?:^|_)day$|(?:^|_)dow$|(?:^|_)quarter$"
+    type: int
+    max_missing: 0.05
+    drop_if_constant: true
+
+  # Generic engineered features with prefix `fe_` (e.g., fe_ratio, fe_norm_x)
+  - pattern: "^fe_"
+    type: number
+    max_missing: 0.10
+    drop_if_constant: true
