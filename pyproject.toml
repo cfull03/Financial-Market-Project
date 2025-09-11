@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsproject"
+version = "0.1.0"
+description = "EDA-first data project: ingest → split → clean → validate → report"
+readme = "README.md"
+authors = [{ name = "Christian Fullerton", email = "christianfullerton@icloud.com" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "matplotlib>=3.8",
+  "pyyaml>=6.0",
+  "typer[all]>=0.12",
+  "scikit-learn>=1.4",
+  "torch>=2.2",
+]
+keywords = ["eda", "data", "cli", "yaml", "pandas"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+# we'll add the CLI module soon; this entrypoint will work once `src/dsproject/pipelines/cli.py` is added
+"dsproj" = "dsproject.pipelines.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+
+[tool.isort]
+profile = "black"

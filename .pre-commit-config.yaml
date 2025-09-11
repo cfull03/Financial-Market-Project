@@ -1,0 +1,76 @@
+# Run `pre-commit install` once locally.
+# CI runs `make lint` which executes all hooks against the full repo.
+
+exclude: |
+  ^(
+    data/|
+    reports/|
+    models/|
+    artifacts/|
+    .ipynb_checkpoints/
+  )
+
+repos:
+  # --- Lightweight sanity checks ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-yaml
+      - id: check-json
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  # --- Strip notebook outputs to keep diffs small ---
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.6.1
+    hooks:
+      - id: nbstripout
+        files: "\\.ipynb$"
+
+  # --- Format Python & notebooks with Black ---
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3
+        additional_dependencies: ["black[jupyter]"]
+        args: ["--line-length=100"]
+
+  # --- Sort imports ---
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile=black", "--line-length=100"]
+
+  # --- Lint Python ---
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          ["flake8-bugbear==24.4.26", "flake8-comprehensions==3.14.0"]
+        args: ["--max-line-length=100"]
+
+  # --- Run linters/formatters on notebooks via nbQA ---
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.9.0
+    hooks:
+      - id: nbqa-black
+        additional_dependencies: ["black==24.8.0", "black[jupyter]"]
+        args: ["--line-length=100"]
+        files: "\\.ipynb$"
+      - id: nbqa-isort
+        additional_dependencies: ["isort==5.13.2"]
+        args: ["--profile=black", "--line-length=100"]
+        files: "\\.ipynb$"
+      - id: nbqa-flake8
+        additional_dependencies:
+          ["flake8==7.1.0", "flake8-bugbear==24.4.26", "flake8-comprehensions==3.14.0"]
+        files: "\\.ipynb$"

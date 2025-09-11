@@ -1,0 +1,79 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.dylib
+*.egg-info/
+.eggs/
+.build/
+build/
+dist/
+.nox/
+.tox/
+.cache/
+.mypy_cache/
+.pytype/
+.pyre/
+.pytest_cache/
+.coverage*
+
+# ---- Environments ----
+.env
+.env.*
+.venv/
+venv/
+ENV/
+
+# ---- Notebooks ----
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# ---- OS & Editors ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ---- Data & Artifacts (keep placeholders) ----
+data/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+models/*
+!models/.gitkeep
+
+reports/figures/*
+!reports/figures/.gitkeep
+reports/metrics/*
+!reports/metrics/.gitkeep
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- Optional ML tooling ----
+mlruns/
+.dvc/
+*.dvc
+
+# ---- Docker ----
+*.pid
+*.tmp
+
+# ---- Misc & Temp ----
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+._*
+
+# ---- Security ----
+*.pem
+*.key
+*.crt
