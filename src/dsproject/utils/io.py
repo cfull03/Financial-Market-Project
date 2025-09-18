@@ -1,16 +1,20 @@
-"""IO utilities for the EDA-first pipeline.
+# ============================
+# File: src/dsproject/utils/io.py
+# ============================
+"""Lightweight I/O helpers for data projects.
 
-Focus on safe filesystem ops and small conveniences used by CLI steps.
-Only the essentials; no ML/DL dependencies.
+Why
+----
+- Keep file formats consistent and safe across scripts.
+- Provide **timestamped** saves to `data/interim` and `data/processed`.
+- Make it easy to locate the **latest** train/test splits even when timestamped.
 """
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Union
 import hashlib
 import json
-import os
-import tempfile
 
 import pandas as pd
 import yaml
@@ -27,118 +31,198 @@ __all__ = [
     "file_hash",
     "infer_id_columns",
     "infer_datetime_columns",
+    # timestamped stage saves (preferred)
+    "to_interm",
+    "to_process",
+    # generic stage saver
+    "to_stage",
 ]
 
 
-# ------------------------------ dirs & paths ------------------------------
+# ---------------------------------------------------------------------------
+# Dirs
+# ---------------------------------------------------------------------------
 
-def ensure_dirs(*dirs: Path | str) -> None:
-    """Create directories if missing.
-    Why: avoid first-run errors when paths don't exist yet.
-    """
+def ensure_dirs(*dirs: Union[str, Path]) -> None:
+    """Create directories if missing (idempotent)."""
     for d in dirs:
         Path(d).mkdir(parents=True, exist_ok=True)
 
 
-def dataset_split_paths(name: str, processed_dir: Path) -> tuple[Path, Path]:
-    """Canonical locations for split CSVs for a dataset name."""
-    train_path = Path(processed_dir) / f"{name}_train.csv"
-    test_path = Path(processed_dir) / f"{name}_test.csv"
-    return train_path, test_path
+# ---------------------------------------------------------------------------
+# CSV / JSON / YAML
+# ---------------------------------------------------------------------------
 
-
-# ------------------------------ atomic writes -----------------------------
-
-def _atomic_write_bytes(data: bytes, path: Path) -> None:
-    """Write bytes atomically.
-    Why: prevents partial files if the process is interrupted.
+def read_csv(path: Union[str, Path], **kwargs: Any) -> pd.DataFrame:
+    """Robust CSV reader with common encoding fallbacks.
+    Why: BOM/encoding differences otherwise cause brittle pipelines.
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(delete=False, dir=path.parent) as tmp:
-        tmp.write(data)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_path = Path(tmp.name)
-    os.replace(tmp_path, path)
+    p = Path(path)
+    try:
+        return pd.read_csv(p, encoding="utf-8", **kwargs)
+    except UnicodeDecodeError:
+        try:
+            return pd.read_csv(p, encoding="utf-8-sig", **kwargs)
+        except UnicodeDecodeError:
+            return pd.read_csv(p, encoding="latin-1", engine="python", **kwargs)
 
 
-def write_json(obj: Any, path: Path, *, indent: int = 2) -> None:
-    _atomic_write_bytes(json.dumps(obj, indent=indent).encode("utf-8"), Path(path))
+def write_csv(df: pd.DataFrame, path: Union[str, Path], *, index: bool = False) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(p, index=index, encoding="utf-8")
+    return p
 
 
-def read_json(path: Path) -> Any:
+def read_json(path: Union[str, Path]) -> Any:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def write_yaml(obj: Any, path: Path) -> None:
-    _atomic_write_bytes(yaml.safe_dump(obj, sort_keys=False).encode("utf-8"), Path(path))
+def write_json(obj: Any, path: Union[str, Path]) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2, ensure_ascii=False)
+    return p
 
 
-def read_yaml(path: Path) -> Any:
+def read_yaml(path: Union[str, Path]) -> Any:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-# ------------------------------ CSV helpers -------------------------------
-
-def read_csv(path: Path, **kwargs) -> pd.DataFrame:
-    """Robust CSV reader with sane fallbacks.
-    Why: handle BOM/encoding quirks without breaking the pipeline.
-    """
-    path = Path(path)
-    try:
-        return pd.read_csv(path, encoding="utf-8", **kwargs)
-    except UnicodeDecodeError:
-        try:
-            return pd.read_csv(path, encoding="utf-8-sig", **kwargs)
-        except UnicodeDecodeError:
-            return pd.read_csv(path, encoding="latin-1", engine="python", **kwargs)
+def write_yaml(obj: Any, path: Union[str, Path]) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        yaml.safe_dump(obj, f, sort_keys=False)
+    return p
 
 
-def write_csv(df: pd.DataFrame, path: Path, *, index: bool = False) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=index)
-    return path
+# ---------------------------------------------------------------------------
+# Hashes
+# ---------------------------------------------------------------------------
 
-
-# ------------------------------ misc utils --------------------------------
-
-def file_hash(path: Path, *, algo: str = "sha256", chunk_size: int = 1 << 16) -> str:
-    """Return hex digest of a file. Useful for lightweight data versioning."""
+def file_hash(path: Union[str, Path], *, algo: str = "sha256", chunk: int = 1 << 16) -> str:
+    """Hash a file for integrity tracking (default sha256)."""
     h = hashlib.new(algo)
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(chunk_size), b""):
-            h.update(chunk)
+        while True:
+            b = f.read(chunk)
+            if not b:
+                break
+            h.update(b)
     return h.hexdigest()
 
 
-def infer_id_columns(df: pd.DataFrame, *, max_unique_frac: float = 0.98, exclude: Optional[Iterable[str]] = None) -> List[str]:
-    """Heuristically find ID-like columns with near-unique values.
-    Why: these are often dropped for EDA/featurization.
-    """
-    exclude = set(exclude or [])
-    ids: List[str] = []
+# ---------------------------------------------------------------------------
+# Inference helpers (EDA convenience)
+# ---------------------------------------------------------------------------
+
+def infer_id_columns(df: pd.DataFrame, *, uniqueness_ratio: float = 0.9, max_cols: int = 8) -> List[str]:
+    """Heuristic: columns with high uniqueness look like IDs; suggest dropping for EDA."""
+    out: List[str] = []
     n = max(len(df), 1)
     for c in df.columns:
-        if c in exclude:
-            continue
-        frac = df[c].nunique(dropna=True) / n
-        if frac >= max_unique_frac:
-            ids.append(c)
-    return ids
+        ratio = df[c].nunique(dropna=True) / n
+        if ratio >= uniqueness_ratio:
+            out.append(c)
+            if len(out) >= max_cols:
+                break
+    return out
 
 
-def infer_datetime_columns(df: pd.DataFrame, *, min_parse_rate: float = 0.9) -> List[str]:
-    """Detect columns that parse cleanly as datetimes.
-    Why: helps configure `datetime_columns` in config.
-    """
-    dt_cols: List[str] = []
+def infer_datetime_columns(df: pd.DataFrame, *, min_parse_ratio: float = 0.7, max_cols: int = 8) -> List[str]:
+    """Heuristic: columns that parse cleanly to datetime are likely timestamps."""
+    out: List[str] = []
     for c in df.columns:
-        s = pd.to_datetime(df[c], errors="coerce", infer_datetime_format=True)
-        rate = 1.0 - float(s.isna().mean())
-        if rate >= min_parse_rate:
-            dt_cols.append(c)
-    return dt_cols
+        try:
+            s = pd.to_datetime(df[c], errors="coerce")
+            ratio = 1.0 - float(s.isna().mean())
+            if ratio >= min_parse_ratio:
+                out.append(c)
+                if len(out) >= max_cols:
+                    break
+        except Exception:
+            continue
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Locate latest split files (handles timestamped names)
+# ---------------------------------------------------------------------------
+
+def _latest_by_glob(dir_: Path, pattern: str) -> Path:
+    matches = [p for p in dir_.glob(pattern) if p.is_file()]
+    if not matches:
+        raise FileNotFoundError(f"No files match {pattern} in {dir_}")
+    return max(matches, key=lambda p: p.stat().st_mtime)
+
+
+def dataset_split_paths(name: str, processed_dir: Union[str, Path]) -> tuple[Path, Path]:
+    """Return latest `{name}_train*.csv` and `{name}_test*.csv` from `processed_dir`.
+    Why: splits are timestamped; callers should still get the newest pair easily.
+    """
+    d = Path(processed_dir)
+    train = _latest_by_glob(d, f"{name}_train*.csv")
+    test = _latest_by_glob(d, f"{name}_test*.csv")
+    return train, test
+
+
+# ---------------------------------------------------------------------------
+# Timestamped stage saves (preferred API)
+# ---------------------------------------------------------------------------
+from datetime import datetime as _dt
+
+
+def _timestamp_for_name() -> str:
+    return _dt.now().strftime("%Y%m%d_%H%M%S")
+
+
+def _as_df(df_or_path: Union[pd.DataFrame, str, Path], **read_kwargs: Any) -> pd.DataFrame:
+    if isinstance(df_or_path, pd.DataFrame):
+        return df_or_path
+    return read_csv(Path(df_or_path), **read_kwargs)
+
+
+def to_stage(
+    df_or_path: Union[pd.DataFrame, str, Path],
+    name: str,
+    stage_dir: Union[str, Path],
+    *,
+    index: bool = False,
+    read_kwargs: Optional[dict] = None,
+) -> Path:
+    """Save to a stage with a `_YYYYMMDD_HHMMSS` suffix (uniform convention)."""
+    read_kwargs = read_kwargs or {}
+    df = _as_df(df_or_path, **read_kwargs)
+    stage_dir = Path(stage_dir)
+    stage_dir.mkdir(parents=True, exist_ok=True)
+
+    out = stage_dir / f"{name}_{_timestamp_for_name()}.csv"
+    return write_csv(df, out, index=index)
+
+
+def to_interm(
+    df_or_path: Union[pd.DataFrame, str, Path],
+    name: str,
+    interim_dir: Union[str, Path],
+    *,
+    index: bool = False,
+    read_kwargs: Optional[dict] = None,
+) -> Path:
+    """Save into `data/interim` as `<name>_YYYYMMDD_HHMMSS.csv`."""
+    return to_stage(df_or_path, name, interim_dir, index=index, read_kwargs=read_kwargs)
+
+
+def to_process(
+    df_or_path: Union[pd.DataFrame, str, Path],
+    name: str,
+    processed_dir: Union[str, Path],
+    *,
+    index: bool = False,
+    read_kwargs: Optional[dict] = None,
+) -> Path:
+    """Save into `data/processed` as `<name>_YYYYMMDD_HHMMSS.csv`."""
+    return to_stage(df_or_path, name, processed_dir, index=index, read_kwargs=read_kwargs)

@@ -1,12 +1,17 @@
-"""Data ingestion and splitting utilities (EDA-first).
+# ============================
+# File: src/dsproject/data/make_dataset.py
+# ============================
+"""Data ingestion and timestamped splitting (EDA-first, no ML/DL).
 
-Functions:
-- ingest_csv: copy a source CSV into data/raw with a canonical name
-- split_csv: deterministic train/test split saved under data/processed
+Why
+----
+- Keep **raw** data canonical and stable (no timestamp in filename).
+- Write **processed** outputs with a timestamp suffix for traceability.
 
-Notes:
-- Uses robust CSV reading with encoding fallbacks.
-- Stratifies on the target when it looks like classification (low cardinality).
+Public API
+----------
+- `ingest_csv(src_csv, raw_dir, name) -> Path`
+- `split_csv(raw_csv, processed_dir, *, target_col, test_size, random_state) -> (Path, Path)`
 """
 from __future__ import annotations
 
@@ -17,19 +22,19 @@ from typing import Optional, Tuple
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from dsproject.utils.io import write_csv, to_process
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["ingest_csv", "split_csv"]
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Internals
 # ---------------------------------------------------------------------------
 
 def _read_csv_robust(path: Path, **kwargs) -> pd.DataFrame:
-    """Read CSV with common encoding fallbacks.
-    Why: avoid breaking the pipeline on BOM/encoding differences.
-    """
+    """Read CSV with encoding fallbacks. Why: BOM/encoding can vary."""
     try:
         return pd.read_csv(path, encoding="utf-8", **kwargs)
     except UnicodeDecodeError:
@@ -44,31 +49,17 @@ def _read_csv_robust(path: Path, **kwargs) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def ingest_csv(src_csv: Path, raw_dir: Path, name: str) -> Path:
-    """Copy data into versioned raw path. Preserves provenance.
+    """Ingest a CSV into **raw** as `<name>.csv` (no timestamp).
 
-    Parameters
-    ----------
-    src_csv : Path
-        Path to the source CSV (any location).
-    raw_dir : Path
-        Project's raw data directory (e.g., data/raw).
-    name : str
-        Base filename to save as (no extension), e.g., "finance".
-
-    Returns
-    -------
-    Path
-        The path of the canonical raw CSV written under raw_dir.
+    Rationale: a stable, canonical filename in raw simplifies diffs & provenance.
     """
     raw_dir = Path(raw_dir)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     df = _read_csv_robust(Path(src_csv))
     out = raw_dir / f"{name}.csv"
-    df.to_csv(out, index=False)
-    logger.info(
-        "Ingested %s → %s (rows=%d, cols=%d)", src_csv, out, df.shape[0], df.shape[1]
-    )
+    write_csv(df, out, index=False)
+    logger.info("Ingested %s → %s (rows=%d, cols=%d)", src_csv, out, df.shape[0], df.shape[1])
     return out
 
 
@@ -80,27 +71,10 @@ def split_csv(
     test_size: float,
     random_state: int,
 ) -> Tuple[Path, Path]:
-    """Create train/test CSVs from a raw dataset.
+    """Split a raw CSV into train/test and save to **processed** with timestamps.
 
-    Stratifies on `target_col` if present and low-cardinality (< 50 unique values).
-
-    Parameters
-    ----------
-    raw_csv : Path
-        Path to canonical raw CSV (e.g., data/raw/finance.csv).
-    processed_dir : Path
-        Output directory for splits (e.g., data/processed).
-    target_col : Optional[str]
-        Column name used for stratified split when classification-like.
-    test_size : float
-        Fraction for test set (0 < test_size < 1).
-    random_state : int
-        Random seed for deterministic splits.
-
-    Returns
-    -------
-    (Path, Path)
-        Paths to train and test CSVs under processed_dir.
+    Stratifies on `target_col` when present and low-cardinality (< 50 uniques).
+    Filenames are `<stem>_train_YYYYMMDD_HHMMSS.csv` and `<stem>_test_...` via `to_process`.
     """
     processed_dir = Path(processed_dir)
     processed_dir.mkdir(parents=True, exist_ok=True)
@@ -110,29 +84,21 @@ def split_csv(
     stratify = None
     if target_col and target_col in df.columns:
         n_unique = df[target_col].nunique(dropna=True)
-        if n_unique > 1 and n_unique < 50:
+        if 1 < n_unique < 50:
             stratify = df[target_col]
-            logger.info(
-                "Stratifying split on target '%s' (unique=%d)", target_col, n_unique
-            )
+            logger.info("Stratifying on '%s' (unique=%d)", target_col, n_unique)
         else:
-            logger.info(
-                "Not stratifying: target '%s' unique values = %d", target_col, n_unique
-            )
-    else:
-        if target_col:
-            logger.warning("Target column '%s' not found; proceeding without stratify.", target_col)
+            logger.info("Not stratifying: '%s' unique=%d", target_col, n_unique)
+    elif target_col:
+        logger.warning("Target column '%s' not found; proceeding without stratify.", target_col)
 
     train_df, test_df = train_test_split(
-        df, test_size=test_size, random_state=random_state, stratify=stratify
+        df, test_size=float(test_size), random_state=int(random_state), stratify=stratify
     )
 
     stem = Path(raw_csv).stem
-    train_path = processed_dir / f"{stem}_train.csv"
-    test_path = processed_dir / f"{stem}_test.csv"
+    train_path = to_process(train_df, f"{stem}_train", processed_dir)
+    test_path = to_process(test_df, f"{stem}_test", processed_dir)
 
-    train_df.to_csv(train_path, index=False)
-    test_df.to_csv(test_path, index=False)
-
-    logger.info("Split %s → train=%s test=%s", raw_csv, train_path, test_path)
+    logger.info("Split %s → train=%s test=%s", raw_csv, train_path.name, test_path.name)
     return train_path, test_path
