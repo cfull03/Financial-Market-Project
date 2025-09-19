@@ -11,10 +11,11 @@ Why
 """
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Iterable, List, Optional, Union
 import hashlib
 import json
+from datetime import datetime as _dt
+from pathlib import Path
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import yaml
@@ -43,6 +44,7 @@ __all__ = [
 # Dirs
 # ---------------------------------------------------------------------------
 
+
 def ensure_dirs(*dirs: Union[str, Path]) -> None:
     """Create directories if missing (idempotent)."""
     for d in dirs:
@@ -52,6 +54,7 @@ def ensure_dirs(*dirs: Union[str, Path]) -> None:
 # ---------------------------------------------------------------------------
 # CSV / JSON / YAML
 # ---------------------------------------------------------------------------
+
 
 def read_csv(path: Union[str, Path], **kwargs: Any) -> pd.DataFrame:
     """Robust CSV reader with common encoding fallbacks.
@@ -104,6 +107,7 @@ def write_yaml(obj: Any, path: Union[str, Path]) -> Path:
 # Hashes
 # ---------------------------------------------------------------------------
 
+
 def file_hash(path: Union[str, Path], *, algo: str = "sha256", chunk: int = 1 << 16) -> str:
     """Hash a file for integrity tracking (default sha256)."""
     h = hashlib.new(algo)
@@ -120,7 +124,10 @@ def file_hash(path: Union[str, Path], *, algo: str = "sha256", chunk: int = 1 <<
 # Inference helpers (EDA convenience)
 # ---------------------------------------------------------------------------
 
-def infer_id_columns(df: pd.DataFrame, *, uniqueness_ratio: float = 0.9, max_cols: int = 8) -> List[str]:
+
+def infer_id_columns(
+    df: pd.DataFrame, *, uniqueness_ratio: float = 0.9, max_cols: int = 8
+) -> List[str]:
     """Heuristic: columns with high uniqueness look like IDs; suggest dropping for EDA."""
     out: List[str] = []
     n = max(len(df), 1)
@@ -133,7 +140,9 @@ def infer_id_columns(df: pd.DataFrame, *, uniqueness_ratio: float = 0.9, max_col
     return out
 
 
-def infer_datetime_columns(df: pd.DataFrame, *, min_parse_ratio: float = 0.7, max_cols: int = 8) -> List[str]:
+def infer_datetime_columns(
+    df: pd.DataFrame, *, min_parse_ratio: float = 0.7, max_cols: int = 8
+) -> List[str]:
     """Heuristic: columns that parse cleanly to datetime are likely timestamps."""
     out: List[str] = []
     for c in df.columns:
@@ -152,6 +161,7 @@ def infer_datetime_columns(df: pd.DataFrame, *, min_parse_ratio: float = 0.7, ma
 # ---------------------------------------------------------------------------
 # Locate latest split files (handles timestamped names)
 # ---------------------------------------------------------------------------
+
 
 def _latest_by_glob(dir_: Path, pattern: str) -> Path:
     matches = [p for p in dir_.glob(pattern) if p.is_file()]
@@ -173,7 +183,6 @@ def dataset_split_paths(name: str, processed_dir: Union[str, Path]) -> tuple[Pat
 # ---------------------------------------------------------------------------
 # Timestamped stage saves (preferred API)
 # ---------------------------------------------------------------------------
-from datetime import datetime as _dt
 
 
 def _timestamp_for_name() -> str:

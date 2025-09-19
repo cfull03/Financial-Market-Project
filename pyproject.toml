@@ -32,7 +32,7 @@ test = [
 ]
 
 [project.scripts]
-# we'll add the CLI module soon; this entrypoint will work once `src/dsproject/pipelines/cli.py` is added
+# Expose the CLI after install: `dsproj`
 "dsproj" = "dsproject.pipelines.cli:main"
 
 [tool.setuptools.packages.find]
@@ -42,5 +42,31 @@ where = ["src"]
 line-length = 100
 target-version = ["py310", "py311"]
 
-[tool.isort]
-profile = "black"
+# ---------------- Ruff (imports & lint) ----------------
+[tool.ruff]
+line-length = 100
+# Match the runtime you target in CI
+target-version = "py311"
+extend-exclude = [
+  "data",
+  "reports",
+  "models",
+  "artifacts",
+  ".ipynb_checkpoints",
+]
+
+[tool.ruff.lint]
+# Enable common rules + import sorting (I)
+select = ["E", "F", "I", "B", "C4"]
+# Long lines handled by Black
+ignore = ["E501"]
+
+# Optional: if you later add pydocstyle or other plugins, you can per-file ignore here
+[tool.ruff.lint.per-file-ignores]
+# "src/dsproject/pipelines/cli.py" = ["D" ]
+"src/dsproject/pipelines/cli.py" = ["B008", "D"]
+
+
+# If you ever use Ruff's formatter; we still run Black in CI, so this is optional
+[tool.ruff.format]
+quote-style = "double"

@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from dsproject.utils.io import write_csv, to_process
+from dsproject.utils.io import to_process, write_csv
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ __all__ = ["ingest_csv", "split_csv"]
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
 
 def _read_csv_robust(path: Path, **kwargs) -> pd.DataFrame:
     """Read CSV with encoding fallbacks. Why: BOM/encoding can vary."""
@@ -47,6 +48,7 @@ def _read_csv_robust(path: Path, **kwargs) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def ingest_csv(src_csv: Path, raw_dir: Path, name: str) -> Path:
     """Ingest a CSV into **raw** as `<name>.csv` (no timestamp).

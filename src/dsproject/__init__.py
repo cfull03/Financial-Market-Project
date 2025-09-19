@@ -4,6 +4,7 @@ Data Science Project (EDA-first)
 Lightweight package initializer. Keeps imports minimal to avoid side effects during installation
 and fast interpreter startup. Exposes only version metadata.
 """
+
 from __future__ import annotations
 
 from importlib import metadata

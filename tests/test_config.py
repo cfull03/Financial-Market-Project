@@ -8,6 +8,7 @@ These tests assume a minimal Config implementation with:
 They validate structure and basic field types without requiring the
 directories to actually exist on disk (CI‑friendly).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -45,13 +46,16 @@ def test_split_test_size_range() -> None:
     assert 0.0 < ts < 1.0
 
 
-@pytest.mark.parametrize("key", [
-    "raw_dir",
-    "interim_dir",
-    "processed_dir",
-    "figures_dir",
-    "metrics_dir",
-])
+@pytest.mark.parametrize(
+    "key",
+    [
+        "raw_dir",
+        "interim_dir",
+        "processed_dir",
+        "figures_dir",
+        "metrics_dir",
+    ],
+)
 def test_paths_string_form_contains_expected_subdirs(key: str) -> None:
     cfg = load_config("configs/default.yaml")
     p = getattr(cfg.paths, key)

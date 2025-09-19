@@ -13,9 +13,7 @@ Outputs go to `data/sample/` and are named `<stem>_sample_n<N>.csv`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Optional
-
-import pandas as pd
+from typing import Optional
 
 from dsproject.config import Config, load_config
 from dsproject.utils.io import ensure_dirs, read_csv, write_csv
@@ -50,7 +48,9 @@ def _candidates(dir_: Path, stage: str, name: Optional[str]) -> list[Path]:
     return [p for p in dict.fromkeys(out) if p.is_file()]  # uniq, keep order
 
 
-def get_latest_csv(stage: str = "processed", name: Optional[str] = None, *, config: Optional[Path] = None) -> Path:
+def get_latest_csv(
+    stage: str = "processed", name: Optional[str] = None, *, config: Optional[Path] = None
+) -> Path:
     """Return the newest CSV by modification time from a stage directory.
     `stage` in {raw, interim, processed}. Optional `name` narrows the search.
     """
@@ -62,7 +62,9 @@ def get_latest_csv(stage: str = "processed", name: Optional[str] = None, *, conf
     return max(cands, key=lambda p: p.stat().st_mtime)
 
 
-def sample_latest(n: int, stage: str = "processed", name: Optional[str] = None, *, config: Optional[Path] = None) -> Path:
+def sample_latest(
+    n: int, stage: str = "processed", name: Optional[str] = None, *, config: Optional[Path] = None
+) -> Path:
     """Sample `n` rows from the latest CSV in the given stage and write to `data/sample/`.
     Only `n` is required for the common case to keep UX minimal.
     """

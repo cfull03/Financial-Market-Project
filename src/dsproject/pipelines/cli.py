@@ -11,6 +11,7 @@ Commands
 - validate     : validate a CSV against `configs/schema.yaml`
 - eda-report   : quick plots (hists/bars/corr) to `reports/figures/`
 - make-sample  : sample N rows from the latest dataset (by stage)
+- auto-process : consume interim/*.csv → processed (once), archive sources
 
 Notes
 -----
@@ -31,13 +32,15 @@ from dsproject.config import Config
 from dsproject.data.make_dataset import ingest_csv, split_csv
 from dsproject.data.make_sample import sample_latest
 from dsproject.features.build_features import simple_clean
-from dsproject.utils.io import ensure_dirs, dataset_split_paths
+from dsproject.pipelines.auto_process import process_inbox
+from dsproject.utils.io import dataset_split_paths, ensure_dirs
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help=__doc__)
 logger = logging.getLogger(__name__)
 
 
 # ------------------------------ shared utils -------------------------------
+
 
 def _setup_logging() -> None:
     logging.basicConfig(
@@ -59,8 +62,9 @@ def _default_name(cfg: Config) -> str:
 
 # ------------------------------ typer root ---------------------------------
 
+
 @app.callback()
-def main(
+def app_init(
     ctx: typer.Context,
     config: Path = typer.Option(Path("configs/default.yaml"), help="Path to config YAML."),
 ):
@@ -71,6 +75,7 @@ def main(
 
 
 # -------------------------------- ingest -----------------------------------
+
 
 @app.command()
 def ingest(
@@ -87,10 +92,13 @@ def ingest(
 
 # -------------------------------- split ------------------------------------
 
+
 @app.command()
 def split(
     ctx: typer.Context,
-    name: Optional[str] = typer.Option(None, help="Dataset base name (defaults to config.project_name)."),
+    name: Optional[str] = typer.Option(
+        None, help="Dataset base name (defaults to config.project_name)."
+    ),
 ):
     cfg: Config = ctx.obj["cfg"]
     ds_name = name or _default_name(cfg)
@@ -107,10 +115,13 @@ def split(
 
 # -------------------------------- clean ------------------------------------
 
+
 @app.command()
 def clean(
     ctx: typer.Context,
-    name: Optional[str] = typer.Option(None, help="Dataset base name (defaults to config.project_name)."),
+    name: Optional[str] = typer.Option(
+        None, help="Dataset base name (defaults to config.project_name)."
+    ),
     add_timeparts: bool = typer.Option(False, help="Expand Date_* parts (year, month, ...)."),
     drop_constants: bool = typer.Option(False, help="Drop constant columns."),
 ):
@@ -143,6 +154,7 @@ def clean(
 
 # ------------------------------- validate ----------------------------------
 
+
 def _compile_feature_rules(schema: dict):
     rules = []
     for r in schema.get("feature_rules", []) or []:
@@ -172,9 +184,15 @@ def _load_schema(path: Path) -> dict:
 @app.command()
 def validate(
     ctx: typer.Context,
-    csv: Optional[Path] = typer.Option(None, help="CSV to validate; defaults to latest processed train."),
-    name: Optional[str] = typer.Option(None, help="Base name to locate split if --csv omitted (defaults to config.project_name)."),
-    schema: Optional[Path] = typer.Option(None, help="Schema YAML path (defaults next to the loaded config)."),
+    csv: Optional[Path] = typer.Option(
+        None, help="CSV to validate; defaults to latest processed train."
+    ),
+    name: Optional[str] = typer.Option(
+        None, help="Base name to locate split if --csv omitted (defaults to config.project_name)."
+    ),
+    schema: Optional[Path] = typer.Option(
+        None, help="Schema YAML path (defaults next to the loaded config)."
+    ),
 ):
     import pandas as pd
 
@@ -235,7 +253,6 @@ def validate(
                 if not matched:
                     errors.append(f"Extra column not allowed by feature_rules: {col}")
                     continue
-                # missing check only (types likely numeric/int)
                 miss = float(df[col].isna().mean())
                 if miss > float(matched.get("max_missing", 1.0)):
                     errors.append(
@@ -255,10 +272,13 @@ def validate(
 
 # ------------------------------- eda-report --------------------------------
 
+
 @app.command("eda-report")
 def eda_report(
     ctx: typer.Context,
-    name: Optional[str] = typer.Option(None, help="Dataset base name (defaults to config.project_name)."),
+    name: Optional[str] = typer.Option(
+        None, help="Dataset base name (defaults to config.project_name)."
+    ),
     clean: bool = typer.Option(True, help="Use *_train_clean*.csv if available."),
     top_k: int = typer.Option(12, help="Top categories to plot for categoricals."),
 ):
@@ -271,12 +291,9 @@ def eda_report(
     figures = cfg.paths.figures_dir
     figures.mkdir(parents=True, exist_ok=True)
 
-    # choose a base CSV
     base_train, _ = dataset_split_paths(ds_name, cfg.paths.processed_dir)
     if clean and "_train_clean" not in base_train.stem:
         try:
-            from glob import glob
-
             candidates = list(Path(cfg.paths.processed_dir).glob(f"{ds_name}_train_clean*.csv"))
             if candidates:
                 candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -286,7 +303,6 @@ def eda_report(
 
     df = pd.read_csv(base_train)
 
-    # numeric hists
     for col in df.columns:
         if pd.api.types.is_numeric_dtype(df[col]):
             plt.figure()
@@ -298,7 +314,6 @@ def eda_report(
             plt.savefig(figures / f"{ds_name}_{col}_hist.png")
             plt.close()
 
-    # categorical bars
     for col in df.columns:
         if not pd.api.types.is_numeric_dtype(df[col]):
             vc = df[col].astype(str).value_counts().head(top_k)
@@ -313,7 +328,6 @@ def eda_report(
             plt.savefig(figures / f"{ds_name}_{col}_bar.png")
             plt.close()
 
-    # correlation heatmap
     num_df = df.select_dtypes(include=[np.number])
     if num_df.shape[1] >= 2:
         corr = num_df.corr(numeric_only=True)
@@ -332,12 +346,15 @@ def eda_report(
 
 # ------------------------------ make-sample --------------------------------
 
+
 @app.command("make-sample")
 def make_sample_cmd(
     ctx: typer.Context,
     n: int = typer.Option(..., help="Number of rows to sample."),
     stage: str = typer.Option("processed", help="Stage to sample from: raw|interim|processed"),
-    name: Optional[str] = typer.Option(None, help="Optional base name to prefer (defaults to config.project_name)."),
+    name: Optional[str] = typer.Option(
+        None, help="Optional base name to prefer (defaults to config.project_name)."
+    ),
 ):
     cfg_path: Path = ctx.obj["config_path"]
     cfg: Config = ctx.obj["cfg"]
@@ -346,7 +363,20 @@ def make_sample_cmd(
     typer.echo(str(out))
 
 
+# ------------------------------ auto-process --------------------------------
+
+
+@app.command("auto-process")
+def auto_process_cmd(ctx: typer.Context):
+    """Process each CSV in `interim/` once: clean → processed (timestamped) → archive source."""
+    cfg: Config = ctx.obj["cfg"]
+    results = process_inbox(cfg)
+    payload = [{"src": str(r.src), "out": str(r.out), "archived": str(r.archived)} for r in results]
+    typer.echo(json.dumps({"processed": payload}))
+
+
 # --------------------------- console entry point ---------------------------
+
 
 def main() -> None:  # pragma: no cover
     app()

@@ -1,6 +1,7 @@
 """Minimal, working config loader (EDA-only).
 Keeps your original structure; fixes the misplaced `@staticmethod`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

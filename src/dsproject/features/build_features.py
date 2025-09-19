@@ -8,14 +8,13 @@ Design goals:
 - Drop ID-like columns to avoid skewing stats/plots.
 - Optional: expand datetime parts, drop constant columns.
 """
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-import numpy as np
 import pandas as pd
 
 from dsproject.utils.io import read_csv, write_csv
@@ -29,6 +28,7 @@ __all__ = [
 
 
 # ------------------------------ helpers ------------------------------------
+
 
 def _to_datetime(df: pd.DataFrame, cols: Iterable[str]) -> pd.DataFrame:
     """Coerce provided columns to datetime where possible.
@@ -53,7 +53,9 @@ def _drop_constant_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     return df, dropped
 
 
-def expand_datetime_parts(df: pd.DataFrame, dt_cols: Iterable[str], *, prefix: Optional[str] = None) -> pd.DataFrame:
+def expand_datetime_parts(
+    df: pd.DataFrame, dt_cols: Iterable[str], *, prefix: Optional[str] = None
+) -> pd.DataFrame:
     """Expand datetime columns into common parts (year, month, day, dow, quarter).
     Why: quick, interpretable temporal features for EDA and simple models later.
     """
@@ -71,6 +73,7 @@ def expand_datetime_parts(df: pd.DataFrame, dt_cols: Iterable[str], *, prefix: O
 
 
 # ------------------------------ public API ---------------------------------
+
 
 def simple_clean(
     csv_in: Path,
@@ -121,7 +124,7 @@ def simple_clean(
     if add_timeparts and datetime_columns:
         before_cols = set(df.columns)
         df = expand_datetime_parts(df, datetime_columns)
-        added = sorted(list(set(df.columns) - before_cols))
+        added = sorted(set(df.columns) - before_cols)
         logger.info("Added datetime parts: %s", added[:10] + (["..."] if len(added) > 10 else []))
         if not keep_original_datetime:
             keep = [c for c in df.columns if c not in datetime_columns]

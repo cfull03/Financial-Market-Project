@@ -7,7 +7,7 @@ exclude: |
     reports/|
     models/|
     artifacts/|
-    .ipynb_checkpoints/
+    \.ipynb_checkpoints/
   )
 
 repos:
@@ -33,7 +33,7 @@ repos:
       - id: nbstripout
         files: "\\.ipynb$"
 
-  # --- Format Python & notebooks with Black ---
+  # --- Code formatter (keep Black to align with CI black --check) ---
   - repo: https://github.com/psf/black
     rev: 24.8.0
     hooks:
@@ -42,23 +42,15 @@ repos:
         additional_dependencies: ["black[jupyter]"]
         args: ["--line-length=100"]
 
-  # --- Sort imports ---
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+  # --- Ruff: linter + import organizer (replaces flake8 + isort) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.8
     hooks:
-      - id: isort
-        args: ["--profile=black", "--line-length=100"]
+      - id: ruff
+        args: ["--fix", "--show-fixes", "--line-length=100"]
+        # By default runs on *.py; config (rules/ignores) can live in pyproject.toml under [tool.ruff]
 
-  # --- Lint Python ---
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.0
-    hooks:
-      - id: flake8
-        additional_dependencies:
-          ["flake8-bugbear==24.4.26", "flake8-comprehensions==3.14.0"]
-        args: ["--max-line-length=100"]
-
-  # --- Run linters/formatters on notebooks via nbQA ---
+  # --- Run tools on notebooks via nbQA ---
   - repo: https://github.com/nbQA-dev/nbQA
     rev: 1.9.0
     hooks:
@@ -66,11 +58,7 @@ repos:
         additional_dependencies: ["black==24.8.0", "black[jupyter]"]
         args: ["--line-length=100"]
         files: "\\.ipynb$"
-      - id: nbqa-isort
-        additional_dependencies: ["isort==5.13.2"]
-        args: ["--profile=black", "--line-length=100"]
-        files: "\\.ipynb$"
-      - id: nbqa-flake8
-        additional_dependencies:
-          ["flake8==7.1.0", "flake8-bugbear==24.4.26", "flake8-comprehensions==3.14.0"]
+      - id: nbqa-ruff
+        additional_dependencies: ["ruff==0.6.8"]
+        args: ["--fix", "--line-length=100"]
         files: "\\.ipynb$"
